@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Users, Plus, X, Clock, RotateCcw } from "lucide-react";
 
-// ---------- 타입 정의 ----------
+// 🟦 타입 정의 — 매우 중요 (이게 없어서 오류 발생했음)
 type Player = {
   id: number;
   name: string;
@@ -24,13 +24,12 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
   const [newGrade, setNewGrade] = useState("D");
   const [newGender, setNewGender] = useState("male");
 
-  // ---------- courts 초기값 (Vercel 오류 해결됨) ----------
+  // 🟩 타입 지정된 courts (빌드 오류 원인 해결)
   const [courts, setCourts] = useState<Court[]>([
     { id: 1, players: [], startTime: null },
     { id: 2, players: [], startTime: null },
     { id: 3, players: [], startTime: null },
   ]);
-
 
   const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
   const [waitingQueues, setWaitingQueues] = useState<number[][]>([[], [], []]);
@@ -52,7 +51,7 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
   const addPlayer = () => {
     if (!newName.trim()) return;
 
-    const newPlayer = {
+    const newPlayer: Player = {
       id: Date.now(),
       name: newName.trim(),
       grade: newGrade,
@@ -140,7 +139,9 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
 
     setCourts(
       courts.map((court) =>
-        court.id === courtId ? { ...court, players: [] as any[], startTime: null } : court
+        court.id === courtId
+          ? { ...court, players: [], startTime: null }
+          : court
       )
     );
   };
@@ -158,7 +159,7 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
 
   // ---------- 코트에 있는 사람들 ----------
   const playersInCourts = new Set(
-    courts.flatMap((court) => court.players.map((p: any) => p.id))
+    courts.flatMap((court) => court.players.map((p) => p.id))
   );
 
   // ---------- 초기화 ----------
@@ -171,9 +172,9 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
     setWaitingQueues([[], [], []]);
 
     setCourts([
-      { id: 1, players: [] as any[], startTime: null },
-      { id: 2, players: [] as any[], startTime: null },
-      { id: 3, players: [] as any[], startTime: null },
+      { id: 1, players: [], startTime: null },
+      { id: 2, players: [], startTime: null },
+      { id: 3, players: [], startTime: null },
     ]);
   };
 
@@ -244,9 +245,7 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
         </div>
 
         {/* 전체 참가자 */}
-        <h2 className="font-semibold text-lg mb-3">
-          전체 참가자 ({players.length}명)
-        </h2>
+        <h2 className="font-semibold text-lg mb-3">전체 참가자 ({players.length}명)</h2>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
           {players.map((p) => {
@@ -259,7 +258,7 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
                 onClick={() =>
                   !isWaiting && isAdmin && togglePlayerSelection(p.id)
                 }
-                className={`p-4 rounded-xl border transition relative
+                className={`p-4 rounded-xl border relative transition
                   ${
                     p.gender === "male"
                       ? "bg-blue-100 border-blue-300"
@@ -269,6 +268,7 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
                   ${isWaiting ? "opacity-50" : ""}
                 `}
               >
+                {/* 삭제 버튼 */}
                 {isAdmin && (
                   <button
                     onClick={(e) => {
@@ -281,16 +281,19 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
                   </button>
                 )}
 
+                {/* 정보 */}
                 <div className="font-bold">{p.name}</div>
                 <div className="text-sm">{p.grade}조</div>
                 <div className="text-xs mt-1">참여: {p.playCount}회</div>
 
+                {/* 플레이 중 */}
                 {playersInCourts.has(p.id) && (
                   <div className="absolute top-1 left-1 bg-black bg-opacity-60 text-white text-xs px-2 py-0.5 rounded z-20">
                     플레이 중
                   </div>
                 )}
 
+                {/* 대기 중 */}
                 {isWaiting && (
                   <div className="absolute top-1 left-1 bg-orange-500 bg-opacity-70 text-white text-xs px-2 py-0.5 rounded z-20">
                     대기 중
@@ -313,9 +316,10 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
           </div>
         )}
 
-        {/* 대기/코트 */}
+        {/* 대기 & 코트 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 대기 */}
+
+          {/* 대기열 */}
           <div>
             <h2 className="font-semibold text-lg mb-3">대기 현황</h2>
 
@@ -402,7 +406,7 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
                 ) : (
                   <div>
                     <div className="grid grid-cols-2 gap-2 mb-2">
-                      {court.players.map((p: any) => (
+                      {court.players.map((p) => (
                         <div
                           key={p.id}
                           className={`p-2 rounded text-sm ${
