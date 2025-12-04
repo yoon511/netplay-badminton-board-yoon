@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { Users, Plus, X, Clock, RotateCcw } from "lucide-react";
-import { db } from "../lib/firebase";
+import { db } from "./lib/firebase";     // ← 요 줄!!
 import { ref, onValue, set } from "firebase/database";
+
 
 type Player = {
   id: number;
