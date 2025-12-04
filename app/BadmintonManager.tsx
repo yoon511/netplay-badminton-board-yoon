@@ -3,25 +3,34 @@
 import React, { useState, useEffect } from "react";
 import { Users, Plus, X, Clock, RotateCcw } from "lucide-react";
 
-// ---------- Court 타입 명확히 지정 (오류 해결 핵심) ----------
+// ---------- 타입 정의 ----------
+type Player = {
+  id: number;
+  name: string;
+  grade: string;
+  gender: string;
+  playCount: number;
+};
+
 type Court = {
   id: number;
-  players: any[];
+  players: Player[];
   startTime: number | null;
 };
 
 export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
-  const [players, setPlayers] = useState<any[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [newName, setNewName] = useState("");
   const [newGrade, setNewGrade] = useState("D");
   const [newGender, setNewGender] = useState("male");
 
-  // ---------- 타입 지정 + 빈 배열 any[] 선언 (빌드 오류 해결됨) ----------
+  // ---------- courts 초기값 (Vercel 오류 해결됨) ----------
   const [courts, setCourts] = useState<Court[]>([
-    { id: 1, players: [] as any[], startTime: null },
-    { id: 2, players: [] as any[], startTime: null },
-    { id: 3, players: [] as any[], startTime: null },
+    { id: 1, players: [], startTime: null },
+    { id: 2, players: [], startTime: null },
+    { id: 3, players: [], startTime: null },
   ]);
+
 
   const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
   const [waitingQueues, setWaitingQueues] = useState<number[][]>([[], [], []]);
