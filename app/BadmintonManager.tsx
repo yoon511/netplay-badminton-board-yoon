@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { Users, Plus, X, Clock, RotateCcw } from "lucide-react";
-
-// 🔥 Firebase 연결
 import { db } from "./lib/firebase";
 import { ref, onValue, set } from "firebase/database";
 
@@ -22,54 +20,57 @@ type Court = {
 };
 
 export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
-  // 상태들
   const [players, setPlayers] = useState<Player[]>([]);
+  const [courts, setCourts] = useState<Court[]>([]);
+  const [waitingQueues, setWaitingQueues] = useState<number[][]>([[], [], []]);
+  const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
   const [newName, setNewName] = useState("");
   const [newGrade, setNewGrade] = useState("D");
   const [newGender, setNewGender] = useState("male");
 
-  const [courts, setCourts] = useState<Court[]>([
-    { id: 1, players: [], startTime: null },
-    { id: 2, players: [], startTime: null },
-    { id: 3, players: [], startTime: null },
-  ]);
-
-  const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
-  const [waitingQueues, setWaitingQueues] = useState<number[][]>([[], [], []]);
-  const [currentTime, setCurrentTime] = useState(Date.now());
-
-  // 1초마다 시간 갱신
+  /* ------------------------------ Firebase Load ------------------------------ */
   useEffect(() => {
-    const t = setInterval(() => setCurrentTime(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  // 🔥 Firebase 데이터 실시간 불러오기
-  useEffect(() => {
-    const dbRef = ref(db, "game-data");
-    return onValue(dbRef, (snapshot) => {
+    const dbRef = ref(database, "/");
+    onValue(dbRef, (snapshot) => {
       const data = snapshot.val();
       if (!data) return;
 
-      if (data.players) setPlayers(data.players);
-      if (data.waitingQueues) setWaitingQueues(data.waitingQueues);
-      if (data.courts) setCourts(data.courts);
+      setPlayers(data.players || []);
+      setWaitingQueues(data.waitingQueues || [[], [], []]);
+      setCourts(data.courts || [
+        { id: 1, players: [], startTime: null },
+        { id: 2, players: [], startTime: null },
+        { id: 3, players: [], startTime: null },
+      ]);
     });
   }, []);
 
-  // 🔥 Firebase 저장 함수
-  const saveData = (data: any) => {
-    set(ref(db, "game-data"), data);
+  /* ------------------------------ Firebase Save ------------------------------ */
+  const saveToDB = (data: any) => {
+    set(ref(database, "/"), {
+      players,
+      courts,
+      waitingQueues,
+      ...data,
+    });
   };
 
-  // 대기열 자동 정리
+  /* ------------------------------ Time Update ------------------------------ */
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  /* ------------------------------ Utility: Compact Queues ------------------------------ */
   const compactWaitingQueues = (queues: number[][]) => {
     const newQueues = queues.filter((q) => q.length > 0);
     while (newQueues.length < 3) newQueues.push([]);
     return newQueues;
   };
 
-  // 참가자 추가
+  /* ------------------------------ Player Add ------------------------------ */
   const addPlayer = () => {
     if (!newName.trim()) return;
 
@@ -81,36 +82,36 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
       playCount: 0,
     };
 
-    const updatedPlayers = [...players, newPlayer];
-    setPlayers(updatedPlayers);
-
-    saveData({
-      players: updatedPlayers,
-      waitingQueues,
-      courts,
-    });
+    const updated = [...players, newPlayer];
+    setPlayers(updated);
+    saveToDB({ players: updated });
 
     setNewName("");
   };
 
-  // 참가자 삭제
+  /* ------------------------------ Remove Player ------------------------------ */
   const removePlayer = (id: number) => {
     if (!isAdmin) return;
 
-    const newPlayers = players.filter((p) => p.id !== id);
-    const newQueues = waitingQueues.map((q) => q.filter((x) => x !== id));
+    const updatedPlayers = players.filter((p) => p.id !== id);
+    const updatedQueues = waitingQueues.map((q) => q.filter((x) => x !== id));
+    const updatedCourts = courts.map((c) => ({
+      ...c,
+      players: c.players.filter((p) => p.id !== id),
+    }));
 
-    setPlayers(newPlayers);
-    setWaitingQueues(newQueues);
+    setPlayers(updatedPlayers);
+    setWaitingQueues(updatedQueues);
+    setCourts(updatedCourts);
 
-    saveData({
-      players: newPlayers,
-      waitingQueues: newQueues,
-      courts,
+    saveToDB({
+      players: updatedPlayers,
+      waitingQueues: updatedQueues,
+      courts: updatedCourts,
     });
   };
 
-  // 플레이어 선택
+  /* ------------------------------ Select Players ------------------------------ */
   const togglePlayerSelection = (id: number) => {
     if (!isAdmin) return;
 
@@ -121,128 +122,121 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
-  // 선택된 4명 → 대기열로 이동
+  /* ------------------------------ Move to Waiting Queue ------------------------------ */
   const moveToWaitingQueue = () => {
     if (!isAdmin) return;
-    if (selectedPlayers.length !== 4) {
-      alert("4명을 선택해주세요!");
-      return;
-    }
+    if (selectedPlayers.length !== 4) return alert("4명을 선택해야 합니다!");
 
-    let targetIndex = waitingQueues.findIndex((q) => q.length === 0);
-    if (targetIndex === -1) {
-      alert("대기열이 가득 찼습니다!");
-      return;
-    }
+    let idx = waitingQueues.findIndex((q) => q.length === 0);
+    if (idx === -1) return alert("대기열이 모두 찼습니다!");
 
     let newQueues = [...waitingQueues];
-    newQueues[targetIndex] = selectedPlayers;
+    newQueues[idx] = selectedPlayers;
     newQueues = compactWaitingQueues(newQueues);
 
     setWaitingQueues(newQueues);
-
-    saveData({
-      players,
-      waitingQueues: newQueues,
-      courts,
-    });
+    saveToDB({ waitingQueues: newQueues });
 
     setSelectedPlayers([]);
   };
 
-  // 대기열 → 코트 배정
+  /* ------------------------------ Assign to Court ------------------------------ */
   const assignToCourt = (courtId: number, queueIndex: number) => {
     if (!isAdmin) return;
 
     const queue = waitingQueues[queueIndex];
     if (queue.length !== 4) return;
 
-    const assignedPlayers = players.filter((p) => queue.includes(p.id));
-    const newCourts = courts.map((c) =>
-      c.id === courtId
-        ? { ...c, players: assignedPlayers, startTime: Date.now() }
-        : c
+    const playingPlayers = players.filter((p) => queue.includes(p.id));
+
+    const updatedCourts = courts.map((court) =>
+      court.id === courtId
+        ? { ...court, players: playingPlayers, startTime: Date.now() }
+        : court
+    );
+
+    const updatedPlayers = players.map((p) =>
+      queue.includes(p.id) ? { ...p, playCount: p.playCount + 1 } : p
     );
 
     let newQueues = [...waitingQueues];
     newQueues[queueIndex] = [];
     newQueues = compactWaitingQueues(newQueues);
 
-    setCourts(newCourts);
+    setCourts(updatedCourts);
+    setPlayers(updatedPlayers);
     setWaitingQueues(newQueues);
 
-    saveData({
-      players,
+    saveToDB({
+      courts: updatedCourts,
+      players: updatedPlayers,
       waitingQueues: newQueues,
-      courts: newCourts,
     });
   };
 
-  // 코트 비우기
+  /* ------------------------------ Clear Court ------------------------------ */
   const clearCourt = (courtId: number) => {
     if (!isAdmin) return;
 
-    const newCourts = courts.map((c) =>
+    const updatedCourts = courts.map((c) =>
       c.id === courtId ? { ...c, players: [], startTime: null } : c
     );
 
-    setCourts(newCourts);
-
-    saveData({
-      players,
-      waitingQueues,
-      courts: newCourts,
-    });
+    setCourts(updatedCourts);
+    saveToDB({ courts: updatedCourts });
   };
 
-  // 시간 계산
+  /* ------------------------------ Time Display ------------------------------ */
   const getElapsedTime = (startTime: number | null) => {
     if (!startTime) return "00:00";
     const sec = Math.floor((currentTime - startTime) / 1000);
-    const min = Math.floor(sec / 60);
-    return `${String(min).padStart(2, "0")}:${String(sec % 60).padStart(
-      2,
-      "0"
-    )}`;
+    return `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(
+      sec % 60
+    ).padStart(2, "0")}`;
   };
 
+  /* ------------------------------ Players in Courts ------------------------------ */
   const playersInCourts = new Set(
-    courts.flatMap((court) => court.players.map((p) => p.id))
+    courts.flatMap((c) => c.players.map((p) => p.id))
   );
 
-  // ---------------- UI -------------------
+  /* ------------------------------ Reset ------------------------------ */
+  const resetAll = () => {
+    if (!isAdmin) return;
+    if (!confirm("모든 데이터를 초기화할까요?")) return;
+
+    const emptyCourts = [
+      { id: 1, players: [], startTime: null },
+      { id: 2, players: [], startTime: null },
+      { id: 3, players: [], startTime: null },
+    ];
+
+    setPlayers([]);
+    setWaitingQueues([[], [], []]);
+    setCourts(emptyCourts);
+
+    saveToDB({
+      players: [],
+      waitingQueues: [[], [], []],
+      courts: emptyCourts,
+    });
+  };
+
+  /* ------------------------------ UI ------------------------------ */
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-xl p-6">
-        
-        {/* 헤더 */}
+
+        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div className="flex gap-3 items-center">
             <Users className="w-8 h-8 text-indigo-600" />
-            <h1 className="text-3xl font-bold">넷플레이 게임판</h1>
+            <h1 className="text-3xl font-bold">넷플레이 게임판_윤정</h1>
           </div>
 
           {isAdmin && (
             <button
-              onClick={() => {
-                if (!confirm("정말 초기화할까요?")) return;
-                setPlayers([]);
-                setWaitingQueues([[], [], []]);
-                setCourts([
-                  { id: 1, players: [], startTime: null },
-                  { id: 2, players: [], startTime: null },
-                  { id: 3, players: [], startTime: null },
-                ]);
-                saveData({
-                  players: [],
-                  waitingQueues: [[], [], []],
-                  courts: [
-                    { id: 1, players: [], startTime: null },
-                    { id: 2, players: [], startTime: null },
-                    { id: 3, players: [], startTime: null },
-                  ],
-                });
-              }}
+              onClick={resetAll}
               className="px-4 py-2 bg-red-500 text-white rounded-lg flex gap-2 items-center"
             >
               <RotateCcw className="w-4 h-4" />
@@ -251,9 +245,9 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
           )}
         </div>
 
-        {/* 참가자 등록 */}
+        {/* Register */}
         <div className="bg-gray-100 p-4 rounded-xl mb-6">
-          <h2 className="font-semibold text-lg mb-3">참가자 등록</h2>
+          <h2 className="font-semibold text-lg mb-3">참가자 등록 (누구나 가능)</h2>
 
           <div className="flex flex-wrap gap-3">
             <input
@@ -294,7 +288,7 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
           </div>
         </div>
 
-        {/* 전체 참가자 */}
+        {/* Players */}
         <h2 className="font-semibold text-lg mb-3">
           전체 참가자 ({players.length}명)
         </h2>
@@ -309,26 +303,15 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
                 key={p.id}
                 onClick={() => !isWaiting && isAdmin && togglePlayerSelection(p.id)}
                 className={`p-4 rounded-xl border relative transition
-                  ${p.gender === "male" ? "bg-blue-100" : "bg-pink-100"}
+                  ${
+                    p.gender === "male"
+                      ? "bg-blue-100 border-blue-300"
+                      : "bg-pink-100 border-pink-300"
+                  }
                   ${isSelected ? "ring-4 ring-yellow-400" : ""}
                   ${isWaiting ? "opacity-50" : ""}
                 `}
               >
-                {/* 플레이 중 */}
-                {playersInCourts.has(p.id) && (
-                  <div className="absolute top-1 left-1 bg-black bg-opacity-60 text-white text-xs px-2 py-0.5 rounded z-20">
-                    플레이 중
-                  </div>
-                )}
-
-                {/* 대기 중 */}
-                {isWaiting && (
-                  <div className="absolute top-1 left-1 bg-orange-500 bg-opacity-70 text-white text-xs px-2 py-0.5 rounded z-20">
-                    대기 중
-                  </div>
-                )}
-
-                {/* 삭제 버튼 */}
                 {isAdmin && (
                   <button
                     onClick={(e) => {
@@ -344,12 +327,24 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
                 <div className="font-bold">{p.name}</div>
                 <div className="text-sm">{p.grade}조</div>
                 <div className="text-xs mt-1">참여: {p.playCount}회</div>
+
+                {playersInCourts.has(p.id) && (
+                  <div className="absolute top-1 left-1 bg-black bg-opacity-60 text-white text-xs px-2 py-0.5 rounded z-20">
+                    플레이 중
+                  </div>
+                )}
+
+                {isWaiting && (
+                  <div className="absolute top-1 left-1 bg-orange-500 bg-opacity-70 text-white text-xs px-2 py-0.5 rounded z-20">
+                    대기 중
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
 
-        {/* 대기 넣기 */}
+        {/* Add to Waiting Queue */}
         {isAdmin && selectedPlayers.length === 4 && (
           <div className="flex justify-center mb-6">
             <button
@@ -361,9 +356,9 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
           </div>
         )}
 
-        {/* 대기 / 코트 */}
+        {/* Waiting + Courts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 대기열 */}
+          {/* Waiting */}
           <div>
             <h2 className="font-semibold text-lg mb-3">대기 현황</h2>
 
@@ -400,7 +395,7 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
             ))}
           </div>
 
-          {/* 코트 */}
+          {/* Courts */}
           <div>
             <h2 className="font-semibold text-lg mb-3">코트 현황</h2>
 
@@ -422,7 +417,6 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
                   )}
                 </div>
 
-                {/* 빈 코트 */}
                 {court.players.length === 0 ? (
                   <div>
                     <div className="text-center text-gray-500 mb-2">빈 코트</div>
@@ -479,7 +473,7 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
         </div>
 
         <p className="text-sm mt-6 text-gray-500">
-          관리자 모드: URL 끝에 <b>?admin=yoon511</b> 붙이기
+          관리자 모드: URL 끝에 <b>?admin=yoon511</b> 을 붙이세요
         </p>
       </div>
     </div>
