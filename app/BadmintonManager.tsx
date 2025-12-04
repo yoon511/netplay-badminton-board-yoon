@@ -3,16 +3,23 @@
 import React, { useState, useEffect } from "react";
 import { Users, Plus, X, Clock, RotateCcw } from "lucide-react";
 
+type Court = {
+  id: number;
+  players: any[];
+  startTime: number | null;
+};
+
 export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
   const [players, setPlayers] = useState<any[]>([]);
   const [newName, setNewName] = useState("");
   const [newGrade, setNewGrade] = useState("D");
   const [newGender, setNewGender] = useState("male");
 
-  const [courts, setCourts] = useState([
-    { id: 1, players: [], startTime: null as number | null },
-    { id: 2, players: [], startTime: null as number | null },
-    { id: 3, players: [], startTime: null as number | null },
+  // ★★★ 타이프 오류 100% 해결된 courts state ★★★
+  const [courts, setCourts] = useState<Court[]>([
+    { id: 1, players: [] as any[], startTime: null },
+    { id: 2, players: [] as any[], startTime: null },
+    { id: 3, players: [] as any[], startTime: null },
   ]);
 
   const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
@@ -67,7 +74,7 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
-  // ---------- 선택된 4명을 대기열로 이동 ----------
+  // ---------- 선택 4명 대기열 이동 ----------
   const moveToWaitingQueue = () => {
     if (!isAdmin) return;
     if (selectedPlayers.length !== 4) return alert("4명을 선택해야 합니다.");
@@ -146,7 +153,7 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
     courts.flatMap((court) => court.players.map((p: any) => p.id))
   );
 
-  // ---------- 초기화 ----------
+  // ---------- 전체 초기화 ----------
   const resetAll = () => {
     if (!isAdmin) return;
     if (!confirm("모든 데이터를 초기화하시겠습니까?")) return;
@@ -156,9 +163,9 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
     setWaitingQueues([[], [], []]);
 
     setCourts([
-      { id: 1, players: [], startTime: null },
-      { id: 2, players: [], startTime: null },
-      { id: 3, players: [], startTime: null },
+      { id: 1, players: [] as any[], startTime: null },
+      { id: 2, players: [] as any[], startTime: null },
+      { id: 3, players: [] as any[], startTime: null },
     ]);
   };
 
@@ -228,8 +235,10 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
           </div>
         </div>
 
-        {/* 전체 참가자 */}
-        <h2 className="font-semibold text-lg mb-3">전체 참가자 ({players.length}명)</h2>
+        {/* 전체 참가자 리스트 */}
+        <h2 className="font-semibold text-lg mb-3">
+          전체 참가자 ({players.length}명)
+        </h2>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
           {players.map((p) => {
@@ -300,9 +309,8 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
           </div>
         )}
 
-        {/* 대기 & 코트 */}
+        {/* 대기열 / 코트 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
           {/* 대기열 */}
           <div>
             <h2 className="font-semibold text-lg mb-3">대기 현황</h2>
@@ -426,4 +434,3 @@ export default function BadmintonManager({ isAdmin }: { isAdmin: boolean }) {
     </div>
   );
 }
-
